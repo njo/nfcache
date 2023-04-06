@@ -24,7 +24,15 @@ If the API token isn't set requests will still be made without it.
 When the service starts it will sequentially fetch the preset cached endpoints before the http server becomes available.
 
 # Test
-TODO!
+Run tests from root with `go test ./...`
+
+```
+➜ go test ./...
+?   	github.com/njo/nfcache/pkg/apiclient	[no test files]
+?   	github.com/njo/nfcache	[no test files]
+ok  	github.com/njo/nfcache/pkg/apiserver	0.601s
+ok  	github.com/njo/nfcache/pkg/datasource	0.464s
+```
 
 # Considerations
 Things that were either skipped for time or just felt out of scope given the assignment.
@@ -39,3 +47,4 @@ Things that were either skipped for time or just felt out of scope given the ass
  - API Client & Data provider doesn't pass through status codes, headers etc.
  - API Client should provide a flexible logger interface. Currently just bubbles up errors.
  - Service metrics: endpoint counters & histograms at a minimum.
+ - Tests for the Github Client & Cached API background fetcher

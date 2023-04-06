@@ -3,6 +3,7 @@ package apiserver
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 )
 
 type GithubSortField int
@@ -15,6 +16,10 @@ const (
 )
 
 func BottomNRepos(reposJSON []byte, field GithubSortField, numResults int) ([]byte, error) {
+	if numResults < 0 {
+		numResults = 0
+	}
+
 	var repos []GithubRepo
 	err := json.Unmarshal(reposJSON, &repos)
 	if err != nil {
@@ -105,7 +110,7 @@ func (rs *repoSorter) Less(i, j int) bool {
 		return true
 	}
 	// Fields are equal, sort on the name instead
-	return r1.Name < r2.Name
+	return strings.ToLower(r1.Name) < strings.ToLower(r2.Name) // We lower because a < B in go
 }
 
 // Map sort fields to a function that compares on that field.

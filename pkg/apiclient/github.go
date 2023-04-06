@@ -19,12 +19,6 @@ const (
 	PerPageDefault    = 100
 )
 
-// Simple interface to make api calls. Should move to a separate file if we create other clients.
-type ApiClient interface {
-	Fetch(context.Context, string) ([]byte, error)    // Standard api fetch
-	FetchAll(context.Context, string) ([]byte, error) // Make API call & flatten paginated results
-}
-
 // Conforms to the api client interface. Can be used concurrently.
 type GithubClient struct {
 	apiKey string
