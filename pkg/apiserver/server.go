@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,9 +61,13 @@ func (s *ApiServer) Shutdown(timeout time.Duration) {
 }
 
 func (s *ApiServer) bootstrapHandler() http.Handler {
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.GET("/healthcheck", healthcheck)
-	r.GET("/view/bottom/:num/:sortAttribute", viewBottomRepos(s))
+
+	// views look like: /view/bottom/10/forks
+	r.GET(fmt.Sprintf("/view/bottom/:%s/:%s", ParamNum, ParamSortAttribute), viewBottomRepos(s))
+
 	for _, url := range CachedEndpoints() {
 		r.GET(url, githubCachedFetch(s, url))
 	}

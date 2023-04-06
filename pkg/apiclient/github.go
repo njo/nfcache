@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,14 +12,14 @@ import (
 )
 
 const (
-	API_URL             = "https://api.github.com/"
-	USER_AGENT          = "nfcache/0.1" // Note: Github API won't pretty print without a browser UA
-	DEFAULT_TIMEOUT_SEC = 10
-	MAX_PAGE_FOLLOW     = 100
-	PER_PAGE_DEFAULT    = 100
+	GithubApiURL      = "https://api.github.com/"
+	UserAgent         = "nfcache/0.1" // Note: Github API won't pretty print without a browser UA
+	DefaultTimeoutSec = 10
+	MaxPageFollow     = 100
+	PerPageDefault    = 100
 )
 
-// Note: could use option struct here
+// Simple interface to make api calls. Should move to a separate file if we create other clients.
 type ApiClient interface {
 	Fetch(context.Context, string) ([]byte, error)    // Standard api fetch
 	FetchAll(context.Context, string) ([]byte, error) // Make API call & flatten paginated results
@@ -33,29 +32,29 @@ type GithubClient struct {
 }
 
 func NewGithub(apiKey string) ApiClient {
-	client := http.Client{Timeout: DEFAULT_TIMEOUT_SEC * time.Second}
-	return NewWithHttpClient(apiKey, &client)
+	client := http.Client{Timeout: DefaultTimeoutSec * time.Second}
+	return NewGithubWithHttpClient(apiKey, &client)
 }
 
-func NewWithHttpClient(apiKey string, client *http.Client) ApiClient {
+func NewGithubWithHttpClient(apiKey string, client *http.Client) ApiClient {
 	return &GithubClient{apiKey, client}
 }
 
 func (g *GithubClient) createRequest(ctx context.Context, path string) (*http.Request, error) {
-	fullUrl, err := url.JoinPath(API_URL, path)
+	fullUrl, err := url.JoinPath(GithubApiURL, path)
 	if err != nil {
 		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullUrl, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if g.apiKey != "" {
 		req.Header.Set("Authorization", "token "+g.apiKey)
 	}
-	req.Header.Set("User-Agent", USER_AGENT)
+	req.Header.Set("User-Agent", UserAgent)
 
 	return req, nil
 }
@@ -71,7 +70,7 @@ func (g *GithubClient) Fetch(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 
-	return extractResponseBody(res), nil
+	return extractResponseBody(res)
 }
 
 func (g *GithubClient) FetchAll(ctx context.Context, path string) ([]byte, error) {
@@ -81,20 +80,23 @@ func (g *GithubClient) FetchAll(ctx context.Context, path string) ([]byte, error
 	}
 
 	pageCount := 1
-	setRequestPagination(req, PER_PAGE_DEFAULT, pageCount)
+	setRequestPagination(req, PerPageDefault, pageCount)
 
 	res, err := g.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	body := extractResponseBody(res)
-	if body == nil {
+	body, err := extractResponseBody(res)
+	if err != nil {
+		return nil, err
+	}
+	if len(body) == 0 {
 		return body, nil
 	}
 
 	// We're only interested in continuing if it's a list
-	// bit of a hack here to early return if it's an object
+	// Bit of a hack here to early return if it's an object
 	if body[0] == '{' {
 		return body, nil
 	}
@@ -102,7 +104,7 @@ func (g *GithubClient) FetchAll(ctx context.Context, path string) ([]byte, error
 	// A slice of json objects to build the final array with
 	var accumulatedJson = make([]map[string]any, 0)
 
-	// A slice of json objects from each request
+	// A slice of json objects for a single request
 	var jsonData []map[string]any
 	err = json.Unmarshal(body, &jsonData)
 	if err != nil {
@@ -112,25 +114,28 @@ func (g *GithubClient) FetchAll(ctx context.Context, path string) ([]byte, error
 	// Unpack the slice from the first request into the accumulator
 	accumulatedJson = append(accumulatedJson, jsonData...)
 
-	for responseHasNext(res) && pageCount < MAX_PAGE_FOLLOW {
+	// Keep adding to the accumulator
+	for responseHasNext(res) && pageCount < MaxPageFollow {
 		pageCount = pageCount + 1
-		setRequestPagination(req, PER_PAGE_DEFAULT, pageCount)
+		setRequestPagination(req, PerPageDefault, pageCount)
 		res, err = g.client.Do(req)
 		if err != nil {
-			break // Return what we've accumulated rather than returning an error
-			//todo: log here
+			return nil, err
 		}
 
-		body := extractResponseBody(res)
+		body, err := extractResponseBody(res)
+		if err != nil {
+			return nil, err
+		}
 		if body == nil {
-			break // Return what we've accumulated rather than returning an error
-			// todo: log here
+			// No explicit error here, just break and send back what we have
+			break
 		}
 
 		jsonData = nil
 		err = json.Unmarshal(body, &jsonData)
 		if err != nil {
-			// todo: log here
+			return nil, err
 		}
 		accumulatedJson = append(accumulatedJson, jsonData...)
 	}
@@ -138,18 +143,18 @@ func (g *GithubClient) FetchAll(ctx context.Context, path string) ([]byte, error
 	return json.Marshal(accumulatedJson)
 }
 
-// Return the response body as a byte array. Empty response returns nil.
-func extractResponseBody(response *http.Response) []byte {
+// Return the response body as a byte array.
+func extractResponseBody(response *http.Response) ([]byte, error) {
 	if response.Body != nil {
 		defer response.Body.Close()
 	}
 
 	body, readErr := io.ReadAll(response.Body)
 	if readErr != nil {
-		return nil
+		return nil, readErr
 	}
 
-	return body
+	return body, nil
 }
 
 func responseHasNext(response *http.Response) bool {

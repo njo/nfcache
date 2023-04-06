@@ -14,48 +14,48 @@ const (
 	UpdatedField
 )
 
-func BottomNRepos(rawJson []byte, sort GithubSortField, numResults int) ([]byte, error) {
+func BottomNRepos(reposJSON []byte, field GithubSortField, numResults int) ([]byte, error) {
 	var repos []GithubRepo
-	err := json.Unmarshal(rawJson, &repos)
+	err := json.Unmarshal(reposJSON, &repos)
 	if err != nil {
 		return nil, err
 	}
 
-	SortRepos(repos, sort)
+	SortRepos(repos, field)
 	if numResults > len(repos) {
 		numResults = len(repos)
 	}
 
-	return sortedSliceToBytes(repos[len(repos)-numResults:], sort)
+	return sortedSliceToJSON(repos[len(repos)-numResults:], field)
 }
 
 // Struct with custom marshaller to encode the return value [["repo",123],...]
-type Pair struct {
+type repoPair struct {
 	Name  string
 	Value any
 }
 
-func (r *Pair) MarshalJSON() ([]byte, error) {
+func (r *repoPair) MarshalJSON() ([]byte, error) {
 	arr := []interface{}{r.Name, r.Value}
 	return json.Marshal(arr)
 }
 
-func sortedSliceToBytes(l []GithubRepo, f GithubSortField) ([]byte, error) {
-	ret := make([]Pair, len(l))
-	for i, r := range l {
-		var p Pair
-		p.Name = r.Name
+func sortedSliceToJSON(repos []GithubRepo, field GithubSortField) ([]byte, error) {
+	ret := make([]repoPair, len(repos))
+	for i, r := range repos {
+		var rp repoPair
+		rp.Name = r.Name
 		// This could be cleaner with reflection but I'd rather avoid it
-		if f == StarsField {
-			p.Value = r.Stars
-		} else if f == ForksField {
-			p.Value = r.Forks
-		} else if f == IssuesField {
-			p.Value = r.Issues
+		if field == StarsField {
+			rp.Value = r.Stars
+		} else if field == ForksField {
+			rp.Value = r.Forks
+		} else if field == IssuesField {
+			rp.Value = r.Issues
 		} else {
-			p.Value = r.Updated
+			rp.Value = r.Updated
 		}
-		ret[i] = p
+		ret[i] = rp
 	}
 	return json.Marshal(ret)
 }
@@ -79,7 +79,7 @@ type repoSorter struct {
 	compare compareFunction
 }
 
-// Sort sorts the argument slice according to the less functions passed to OrderedBy.
+// In-Place sort of the provided repo slice on the specified field.
 func SortRepos(repos []GithubRepo, field GithubSortField) {
 	rs := repoSorter{repos, sortFieldToFunc(field)}
 	sort.Sort(&rs)
@@ -95,8 +95,7 @@ func (rs *repoSorter) Swap(i, j int) {
 	rs.repos[i], rs.repos[j] = rs.repos[j], rs.repos[i]
 }
 
-// Although this is named Less for the interface we inverse
-// when sorting values to get descending order.
+// This is named Less for the interface but we inverse when sorting values to get descending order.
 func (rs *repoSorter) Less(i, j int) bool {
 	r1, r2 := &rs.repos[i], &rs.repos[j]
 	if rs.compare(r1, r2) {
@@ -106,36 +105,26 @@ func (rs *repoSorter) Less(i, j int) bool {
 		return true
 	}
 	// Fields are equal, sort on the name instead
-	if r1.Name < r2.Name {
-		return true
+	return r1.Name < r2.Name
+}
+
+// Map sort fields to a function that compares on that field.
+func sortFieldToFunc(field GithubSortField) compareFunction {
+	if field == ForksField {
+		return func(r1, r2 *GithubRepo) bool {
+			return r1.Forks < r2.Forks
+		}
+	} else if field == IssuesField {
+		return func(r1, r2 *GithubRepo) bool {
+			return r1.Issues < r2.Issues
+		}
+
+	} else if field == UpdatedField {
+		return func(r1, r2 *GithubRepo) bool {
+			return r1.Updated < r2.Updated
+		}
 	}
-	return false
-}
-
-func sortFieldToFunc(s GithubSortField) compareFunction {
-	// Switch statement was longer here :)
-	if s == ForksField {
-		return compareForks
-	} else if s == IssuesField {
-		return compareIssues
-	} else if s == UpdatedField {
-		return compareUpdated
+	return func(r1, r2 *GithubRepo) bool {
+		return r1.Stars < r2.Stars
 	}
-	return compareStars
-}
-
-func compareUpdated(r1, r2 *GithubRepo) bool {
-	return r1.Updated < r2.Updated
-}
-
-func compareForks(r1, r2 *GithubRepo) bool {
-	return r1.Forks < r2.Forks
-}
-
-func compareStars(r1, r2 *GithubRepo) bool {
-	return r1.Stars < r2.Stars
-}
-
-func compareIssues(r1, r2 *GithubRepo) bool {
-	return r1.Issues < r2.Issues
 }

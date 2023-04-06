@@ -54,9 +54,9 @@ func main() {
 			logger.Fatalf("unable to fetch %s on startup: %v\n", path, err)
 		}
 	}
-	apiCache.Run(time.Second * 60)            // Keeps the cache updated in the background
-	listenAddress := ":" + strconv.Itoa(port) // Listen on all interfaces with specified port
-	go server.Run(listenAddress)              // Run the service in a separate thread to not block signal handler
+	apiCache.Run(datasource.DefaultUpdateIntervalSec * time.Second) // Keeps the cache updated in the background
+	listenAddress := ":" + strconv.Itoa(port)
+	go server.Run(listenAddress) // Run the service in a separate thread to not block signal handler
 
 	// Wait for shutdown signals
 	quit := make(chan os.Signal, 1)
