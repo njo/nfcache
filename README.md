@@ -1,11 +1,11 @@
 # About
-A service to proxy API requests and cache a subset.
+A service to proxy API requests and cache a subset of responses.
 
-API Server is the http service including handlers and custom views.
+API Server is the http service, response handlers and custom views.
 
-The cached API datasource uses a provided API Client to make calls to an upstream API. Endpoints set to watched are automatically updated on an interval in a separate thread. Other endpoints proxied through this datasource are not cached.
+The Cached API datasource uses a provided API Client to make calls to an upstream API. Endpoints set to be watched are automatically updated on an interval in a separate thread. Other endpoints proxied through this datasource are not cached.
 
-A github client is provided as the only API client.
+A github client is provided as the only API Client but the interface is reusable in the Cached API.
 
 # Build
 1. Install go -> https://go.dev/doc/install (tested with v1.20.2)
@@ -21,7 +21,7 @@ Run the compiled binary with the optional -p flag to set the port
 `GITHUB_API_TOKEN` can be specified as an env var or in a .env file.
 If the API token isn't set requests will still be made without it.
 
-When the service starts it will sequentially fetch the preset cached endpoints before the http server becomes available.
+When the service starts it will sequentially fetch the preset cached endpoints before the http server becomes available. This may take upwards of 10 seconds.
 
 # Test
 Run tests from root with `go test ./...`
@@ -47,4 +47,4 @@ Things that were either skipped for time or just felt out of scope given the ass
  - API Client & Data provider doesn't pass through status codes, headers etc.
  - API Client should provide a flexible logger interface. Currently just bubbles up errors.
  - Service metrics: endpoint counters & histograms at a minimum.
- - Tests for the Github Client & Cached API background fetcher
+ - Tests for the Github Client & Cached API background fetcher.
