@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const DefaultFetchTimeoutSec = 20
+const DefaultFetchTimeoutSec = 30
 const DefaultUpdateIntervalSec = 60
 
 type ApiData struct {
@@ -62,7 +62,8 @@ func (c *CachedAPI) dataUpdater(updateInterval time.Duration) {
 		case <-ticker.C:
 			c.lock.RLock() // We don't hold this long since we update in goroutines
 			for path := range c.cachedData {
-				// Keep in mind if updateEndpoint() is changed to block this will deadlock
+				// Keep in mind if updateEndpoint() is changed to block this will deadlock.
+				// Can simply copy the paths to a separate slice first to avoid this.
 				go c.updateEndpoint(path, DefaultFetchTimeoutSec*time.Second)
 			}
 			c.lock.RUnlock()
@@ -70,6 +71,7 @@ func (c *CachedAPI) dataUpdater(updateInterval time.Duration) {
 	}
 }
 
+// Update (or add) the given path into the cache.
 func (c *CachedAPI) updateEndpoint(path string, timeout time.Duration) error {
 	c.wg.Add(1)
 	defer c.wg.Done()

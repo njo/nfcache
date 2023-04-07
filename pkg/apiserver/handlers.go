@@ -18,7 +18,7 @@ func githubCachedFetch(s *ApiServer, path string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jsonData, err := s.githubCachedAPI.Fetch(c.Request.Context(), path)
 		if err != nil {
-			s.log.Infof("Fetch %s failed with: %v", path, err)
+			s.log.Errorf("Fetch %s failed with: %v", path, err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
@@ -36,7 +36,7 @@ func githubProxyRequest(s *ApiServer) gin.HandlerFunc {
 		path := c.Request.URL.Path
 		jsonData, err := s.githubCachedAPI.Fetch(c.Request.Context(), path)
 		if err != nil {
-			s.log.Infof("Fetch %s failed with: %v", path, err)
+			s.log.Errorf("Fetch %s failed with: %v", path, err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
@@ -70,20 +70,20 @@ func viewBottomRepos(s *ApiServer) gin.HandlerFunc {
 			return
 		}
 
-		jsonData, err := s.githubCachedAPI.Fetch(c.Request.Context(), NetflixOrgReposURL)
-		if err != nil || len(jsonData) == 0 {
-			s.log.Infof("Fetch bottomRepo data failed with: %v", err)
+		jsonRepos, err := s.githubCachedAPI.Fetch(c.Request.Context(), ApiPathNetflixOrgRepos)
+		if err != nil || len(jsonRepos) == 0 {
+			s.log.Errorf("Fetch bottomRepo data failed with: %v", err)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-		jsonData, err = BottomNRepos(jsonData, attributes[sortAttribute], numResults)
+		sortedJsonRepos, err := BottomNRepos(jsonRepos, attributes[sortAttribute], numResults)
 		if err != nil {
-			s.log.Infof("bottomNRepos failed with: %v", err)
-			s.log.Debug("repoData:\n%v", jsonData)
+			s.log.Errorf("BottomNRepos sort failed with: %v", err)
+			s.log.Debug("full repoData:\n%v", jsonRepos)
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 
-		c.Data(http.StatusOK, gin.MIMEJSON, jsonData)
+		c.Data(http.StatusOK, gin.MIMEJSON, sortedJsonRepos)
 	}
 }

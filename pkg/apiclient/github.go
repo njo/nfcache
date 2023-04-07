@@ -30,6 +30,7 @@ func NewGithub(apiKey string) ApiClient {
 	return NewGithubWithHttpClient(apiKey, &client)
 }
 
+// For when the caller wants to tune their own http client (or use a mock in testing).
 func NewGithubWithHttpClient(apiKey string, client *http.Client) ApiClient {
 	return &GithubClient{apiKey, client}
 }

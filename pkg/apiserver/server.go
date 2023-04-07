@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	NetflixOrgURL        = "/orgs/Netflix"
-	NetflixOrgMembersURL = NetflixOrgURL + "/members"
-	NetflixOrgReposURL   = NetflixOrgURL + "/repos"
+	ApiPathNetflixOrg        = "/orgs/Netflix"
+	ApiPathNetflixOrgMembers = ApiPathNetflixOrg + "/members"
+	ApiPathNetflixOrgRepos   = ApiPathNetflixOrg + "/repos"
 )
 
 type ApiServer struct {
@@ -25,7 +25,7 @@ type ApiServer struct {
 }
 
 func CachedEndpoints() []string {
-	return []string{"/", NetflixOrgURL, NetflixOrgMembersURL, NetflixOrgReposURL}
+	return []string{"/", ApiPathNetflixOrg, ApiPathNetflixOrgMembers, ApiPathNetflixOrgRepos}
 }
 
 func New(githubCache *datasource.CachedAPI, logger *zap.SugaredLogger) *ApiServer {
@@ -37,9 +37,11 @@ func New(githubCache *datasource.CachedAPI, logger *zap.SugaredLogger) *ApiServe
 }
 
 func (s *ApiServer) Run(address string) {
-	s.httpServer = &http.Server{
-		Addr:    address,
-		Handler: s.bootstrapHandler(),
+	if s.httpServer == nil {
+		s.httpServer = &http.Server{
+			Addr:    address,
+			Handler: s.bootstrapHandler(),
+		}
 	}
 	s.log.Infof("Listening on %s", address)
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -68,8 +70,8 @@ func (s *ApiServer) bootstrapHandler() http.Handler {
 	// views look like: /view/bottom/10/forks
 	r.GET(fmt.Sprintf("/view/bottom/:%s/:%s", ParamNum, ParamSortAttribute), viewBottomRepos(s))
 
-	for _, url := range CachedEndpoints() {
-		r.GET(url, githubCachedFetch(s, url))
+	for _, path := range CachedEndpoints() {
+		r.GET(path, githubCachedFetch(s, path))
 	}
 	r.NoRoute(githubProxyRequest(s)) // Proxy unknown urls instead of 404ing
 	return r.Handler()

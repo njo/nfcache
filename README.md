@@ -30,6 +30,8 @@ ok  	github.com/njo/nfcache/pkg/datasource	0.464s
 
 # Design Overview
 
+Please note this codebase generally follows the Google [Go style guide](https://google.github.io/styleguide/go/decisions#naming).
+
 ## Components
 API Server is the http service which contains response handlers and the logic for custom views.
 
@@ -40,9 +42,11 @@ A github client is provided as the only API Client implementation.
 ## Design Decisions
 The service was written with the idea that adding new upstream APIs should be straightforward. Each upstream API would likely require different cache settings so the intention is to create a new Cached API for each external API. This approach also allows us to keep the ingress handler logic simple and easily warm the cache before starting the service. 
 
-Allowing the Cached API to update based on inbound requests & the cached version expiry time rather than using the background thread would be straight forward to add to the current implementation.
+Allowing the Cached API to act as a "read-through" cache rather than "refresh-ahead" would be straight forward to add to the current implementation.
 
-A generic cache called explicitly from the ingress handler would have been another viable design.
+A generic "write-through" cache called explicitly from the ingress handler would have been another viable design.
+
+One wart with the current implementation is the implicit fetch vs fetch-all call made by the Cached API (fetch-all called for cached entries only).
 
 ## Omissions
 Things that were either skipped for time or just felt out of scope for the exercise.
